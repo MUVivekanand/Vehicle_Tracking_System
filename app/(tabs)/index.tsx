@@ -1,23 +1,48 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, ActivityIndicator, Button, Linking } from 'react-native';
 import axios from 'axios';
+import Constants from 'expo-constants';
 
 export default function App() {
   const [channelData, setChannelData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const CHANNEL_ID = '2899206';
-  const READ_API_KEY = 'K5H4IGTGX5E20NMW';
+  const getEnvVar = (name) => {
+    if (Constants.expoConfig && Constants.expoConfig.extra && Constants.expoConfig.extra[name] !== undefined) {
+      return Constants.expoConfig.extra[name];
+    }
+    if (Constants.manifest && Constants.manifest.extra && Constants.manifest.extra[name] !== undefined) {
+      return Constants.manifest.extra[name];
+    }
+    
+    console.warn(`Environment variable ${name} not found in Constants`);
+    return null;
+  };
+
+  const CHANNEL_ID = getEnvVar('CHANNEL_ID');
+  const READ_API_KEY = getEnvVar('READ_API_KEY');
+
+  console.log("CHANNEL_ID:", CHANNEL_ID);
+  console.log("READ_API_KEY:", READ_API_KEY ? "Exists" : "Not found");
 
   useEffect(() => {
     const fetchChannelData = async () => {
+      if (!CHANNEL_ID || !READ_API_KEY) {
+        setError("Environment variables not loaded properly");
+        setLoading(false);
+        return;
+      }
+
       try {
-        const response = await axios.get(
-          `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${READ_API_KEY}&results=10`
-        );
+        const url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${READ_API_KEY}&results=10`;
+        console.log("Fetching from URL:", url);
+        
+        const response = await axios.get(url);
         setChannelData(response.data);
       } catch (error) {
         console.error('Error fetching channel data:', error);
+        setError(error.message || "Failed to fetch data");
       } finally {
         setLoading(false);
       }
@@ -45,6 +70,13 @@ export default function App() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>ThingSpeak Channel Data</Text>
+      
+      {error && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Error: {error}</Text>
+        </View>
+      )}
+      
       {loading ? (
         <ActivityIndicator size="large" color="#0000ff" />
       ) : channelData ? (
@@ -98,4 +130,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#e3f2fd',
     borderRadius: 8,
   },
+  errorContainer: {
+    padding: 10,
+    backgroundColor: '#ffebee',
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  errorText: {
+    color: '#c62828',
+  }
 });

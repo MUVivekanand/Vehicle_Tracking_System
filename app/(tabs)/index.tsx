@@ -1,74 +1,101 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, Text, View, ScrollView, ActivityIndicator, Button, Linking } from 'react-native';
+import axios from 'axios';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+export default function App() {
+  const [channelData, setChannelData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-export default function HomeScreen() {
+  const CHANNEL_ID = '2899206';
+  const READ_API_KEY = 'K5H4IGTGX5E20NMW';
+
+  useEffect(() => {
+    const fetchChannelData = async () => {
+      try {
+        const response = await axios.get(
+          `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${READ_API_KEY}&results=10`
+        );
+        setChannelData(response.data);
+      } catch (error) {
+        console.error('Error fetching channel data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchChannelData();
+  }, []);
+
+  const openGoogleMaps = (rawText) => {
+    try {
+      const match = rawText.match(/([\d.-]+),([\d.-]+)/);
+      if (match) {
+        const lat = match[1];
+        const lng = match[2];
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+        Linking.openURL(url).catch((err) => console.error("Failed to open Maps:", err));
+      } else {
+        console.warn("Invalid location format:", rawText);
+      }
+    } catch (e) {
+      console.error("Error parsing location:", e);
+    }
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>ThingSpeak Channel Data</Text>
+      {loading ? (
+        <ActivityIndicator size="large" color="#0000ff" />
+      ) : channelData ? (
+        <>
+          <Text style={styles.channelName}>{channelData.channel.name}</Text>
+          {channelData.feeds.map((feed, index) => (
+            <View key={index} style={styles.feedCard}>
+              <Text>Entry ID: {feed.entry_id}</Text>
+              <Text>Time: {feed.created_at}</Text>
+              <Text>Field1: {feed.field1}</Text>
+              <Text>Field2: {feed.field2}</Text>
+              {feed.field3 ? (
+                <Button
+                  title="Open in Google Maps"
+                  onPress={() => openGoogleMaps(feed.field3)}
+                  color="#1e88e5"
+                />
+              ) : (
+                <Text>No location data</Text>
+              )}
+            </View>
+          ))}
+        </>
+      ) : (
+        <Text>No data available.</Text>
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 100,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  title: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  channelName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  feedCard: {
+    marginBottom: 15,
+    padding: 10,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 8,
   },
 });
